@@ -19,10 +19,10 @@ namespace TestApp
 
     class Program
     {
-
-
         static void Main(string[] args)
         {
+            //args = new[] { "test" };
+
             if (args == null || args.Length == 0)
             {
                 Client.Start();
