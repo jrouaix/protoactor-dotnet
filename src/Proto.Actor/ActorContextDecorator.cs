@@ -5,11 +5,11 @@ using System.Threading.Tasks;
 
 namespace Proto
 {
-    public abstract class ActorContextDecorator : IContext
+    public abstract class ActorContextDecorator : IMessageInvokerContext
     {
-        private readonly IContext _context;
+        private readonly IMessageInvokerContext _context;
 
-        protected ActorContextDecorator(IContext context)
+        protected ActorContextDecorator(IMessageInvokerContext context)
         {
             _context = context;
         }
@@ -66,5 +66,11 @@ namespace Proto
             _context.ReenterAfter(target, action);
 
         public virtual void ReenterAfter(Task target, Action action) => _context.ReenterAfter(target, action);
+
+        public Task InvokeSystemMessageAsync(object msg) => _context.InvokeSystemMessageAsync(msg);
+
+        public Task InvokeUserMessageAsync(object msg) => _context.InvokeUserMessageAsync(msg);
+
+        public void EscalateFailure(Exception reason, object message) => _context.EscalateFailure(reason, message);
     }
 }

@@ -66,7 +66,7 @@ namespace Proto
         }
     }
 
-    public class ActorContext : IMessageInvoker, IContext, ISupervisor
+    public class ActorContext : IMessageInvokerContext, ISupervisor
     {
         public static readonly ImmutableHashSet<PID> EmptyChildren = ImmutableHashSet<PID>.Empty;
         private readonly Props _props;
@@ -83,8 +83,8 @@ namespace Proto
                 var context = _props?.ContextDecorator(this) ?? this;
                 _extras = new ActorContextExtras(context);
             }
-            
-            return _extras ;
+
+            return _extras;
         }
 
         public ActorContext(Props props, PID parent)
@@ -351,13 +351,12 @@ namespace Proto
                 return Done;
             }
 
-
             //are we using decorators, if so, ensure it has been created
-            if (_props.ContextDecorator != null)
+            if (_props.ContextDecorator != Props.DefaultContextDecorator || _props.ContextDecorator != null)
             {
                 return Actor.ReceiveAsync(EnsureExtras().Context);
             }
-            
+
             return Actor.ReceiveAsync(this);
         }
 
@@ -368,6 +367,7 @@ namespace Proto
             {
                 return _props.ReceiveMiddlewareChain(EnsureExtras().Context, MessageEnvelope.Wrap(msg));
             }
+
             //fast path, 0 alloc invocation of actor receive
             _messageOrEnvelope = msg;
             return DefaultReceive();

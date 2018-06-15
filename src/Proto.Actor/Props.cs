@@ -37,7 +37,7 @@ namespace Proto
         public IList<Func<Sender, Sender>> SenderMiddleware { get; private set; } = new List<Func<Sender, Sender>>();
         public Receiver ReceiveMiddlewareChain { get; private set; }
         public Sender SenderMiddlewareChain { get; private set; }
-        public Func<IContext, IContext> ContextDecorator { get; private set; } = DefaultContextDecorator;
+        public Func<IMessageInvokerContext, IMessageInvokerContext> ContextDecorator { get; private set; } = DefaultContextDecorator;
 
         public Spawner Spawner
         {
@@ -45,13 +45,17 @@ namespace Proto
             private set => _spawner = value;
         }
 
-        private static IContext DefaultContextDecorator(IContext context) => context;
+        internal static IMessageInvokerContext DefaultContextDecorator(IMessageInvokerContext context) => context;
 
         private static IMailbox ProduceDefaultMailbox() => UnboundedMailbox.Create();
 
-        private static PID DefaultSpawner (string name,Props props,PID parent)
+        private static PID DefaultSpawner(string name, Props props, PID parent)
         {
             var ctx = new ActorContext(props, parent);
+            var decoratedCtx = props.ContextDecorator != DefaultContextDecorator && props.ContextDecorator != null
+                ? props.ContextDecorator(ctx)
+                : null;
+
             var mailbox = props.MailboxProducer();
             var dispatcher = props.Dispatcher;
             var process = new ActorProcess(mailbox);
@@ -61,7 +65,7 @@ namespace Proto
                 throw new ProcessNameExistException(name, pid);
             }
             ctx.Self = pid;
-            mailbox.RegisterHandlers(ctx, dispatcher);
+            mailbox.RegisterHandlers(decoratedCtx ?? ctx, dispatcher);
             mailbox.PostSystemMessage(Started.Instance);
             mailbox.Start();
 
@@ -74,9 +78,9 @@ namespace Proto
 
         public Props WithMailbox(Func<IMailbox> mailboxProducer) => Copy(props => props.MailboxProducer = mailboxProducer);
 
-        public Props WithContextDecorator(Func<IContext, IContext> contextDecorator) =>
+        public Props WithContextDecorator(Func<IMessageInvokerContext, IMessageInvokerContext> contextDecorator) =>
             Copy(props => props.ContextDecorator = contextDecorator);
-        
+
         public Props WithGuardianSupervisorStrategy(ISupervisorStrategy guardianStrategy) => Copy(props => props.GuardianStrategy = guardianStrategy);
 
         public Props WithChildSupervisorStrategy(ISupervisorStrategy supervisorStrategy) => Copy(props => props.SupervisorStrategy = supervisorStrategy);
@@ -85,14 +89,14 @@ namespace Proto
         {
             props.ReceiveMiddleware = ReceiveMiddleware.Concat(middleware).ToList();
             props.ReceiveMiddlewareChain = props.ReceiveMiddleware.Reverse()
-                                                .Aggregate((Receiver) Middleware.Receive, (inner, outer) => outer(inner));
+                                                .Aggregate((Receiver)Middleware.Receive, (inner, outer) => outer(inner));
         });
 
         public Props WithSenderMiddleware(params Func<Sender, Sender>[] middleware) => Copy(props =>
         {
             props.SenderMiddleware = SenderMiddleware.Concat(middleware).ToList();
             props.SenderMiddlewareChain = props.SenderMiddleware.Reverse()
-                                               .Aggregate((Sender) Middleware.Sender, (inner, outer) => outer(inner));
+                                               .Aggregate((Sender)Middleware.Sender, (inner, outer) => outer(inner));
         });
 
         public Props WithSpawner(Spawner spawner) => Copy(props => props.Spawner = spawner);
@@ -110,7 +114,7 @@ namespace Proto
                 SenderMiddlewareChain = SenderMiddlewareChain,
                 Spawner = Spawner,
                 SupervisorStrategy = SupervisorStrategy,
-                ContextDecorator =  ContextDecorator,
+                ContextDecorator = ContextDecorator,
             };
             mutator(props);
             return props;
