@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using chat.messages;
 using Jaeger;
 using Jaeger.Samplers;
@@ -23,6 +25,8 @@ class Program
         Serialization.RegisterFileDescriptor(ChatReflection.Descriptor);
         Remote.Start("127.0.0.1", 8000);
 
+        const string SERVER_NAME = "SERVER_NAME";
+
         var clients = new HashSet<PID>();
         var props = Props.FromFunc(ctx =>
         {
@@ -33,6 +37,11 @@ class Program
                     clients.Add(connect.Sender);
                     ctx.Send(connect.Sender, new Connected { Message = "Welcome!" });
                     break;
+
+                case SayRequest check when check.UserName == SERVER_NAME:
+                    ctx.Respond(new SayResponse());
+                    break;
+
                 case SayRequest sayRequest:
                     foreach (var client in clients)
                     {
@@ -43,6 +52,7 @@ class Program
                         });
                     }
                     break;
+
                 case NickRequest nickRequest:
                     foreach (var client in clients)
                     {
@@ -58,7 +68,28 @@ class Program
         })
         .WithOpenTracing(spanSetup, spanSetup);
 
-        context.SpawnNamed(props, "chatserver");
+        var serverPid = context.SpawnNamed(props, "chatserver");
+
+        Task.Run(async () =>
+        {
+            while (true)
+            {
+                try
+                {
+                    await context.RequestAsync<SayResponse>(serverPid, new SayRequest { UserName = SERVER_NAME }, TimeSpan.FromSeconds(1)).ConfigureAwait(false);
+                    context.RequestAsync<SayResponse>(serverPid, new SayRequest { UserName = SERVER_NAME }, TimeSpan.FromSeconds(1)).Wait();
+                    Console.WriteLine("Server auto check OK.");
+                    await Task.Delay(2000);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                    Console.WriteLine(ex.StackTrace);
+                }
+            }
+        });
+
+        Console.WriteLine("Press [Enter] to leave Server");
         Console.ReadLine();
     }
 }

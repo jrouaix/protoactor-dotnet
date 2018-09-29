@@ -44,6 +44,17 @@ namespace Proto
 
             if (cts != null)
             {
+                //cts.Token.Register(() =>
+                //{
+                //    Stop(pid);
+                //    if (_tcs.Task.IsCompleted)
+                //    {
+                //        return;
+                //    }
+                //    _tcs.TrySetException(new TimeoutException("Request didn't receive any Response within the expected time."));
+                //});
+
+
                 //TODO: I don't think this is correct, there is probably a more kosher way to do this
                 System.Threading.Tasks.Task.Delay(-1, cts.Token)
                     .ContinueWith(t =>
@@ -53,8 +64,7 @@ namespace Proto
                             return;
                         }
 
-                        _tcs.TrySetException(
-                            new TimeoutException("Request didn't receive any Response within the expected time."));
+                        _tcs.TrySetException(new TimeoutException("Request didn't receive any Response within the expected time."));
                         Stop(pid);
                     });
             }
@@ -77,7 +87,7 @@ namespace Proto
                     return;
                 }
 
-                _tcs.TrySetResult((T) msg);
+                _tcs.TrySetResult((T)msg);
                 Stop(Pid);
             }
             else

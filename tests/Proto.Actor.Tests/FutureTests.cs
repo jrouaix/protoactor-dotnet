@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Proto.Remote;
+using System;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace Proto.Tests
@@ -6,7 +8,7 @@ namespace Proto.Tests
     public class FutureTests
     {
         private static readonly RootContext Context = new RootContext();
-        
+
         [Fact]
         public void Given_Actor_When_AwaitRequestAsync_Should_ReturnReply()
         {
@@ -43,7 +45,7 @@ namespace Proto.Tests
                     ctx.Respond(ctx.Message + reply1);
                 }
             }));
-            
+
 
             var reply2 = Context.RequestAsync<string>(pid2, "hello").Result;
 
@@ -65,6 +67,79 @@ namespace Proto.Tests
             var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
 
             Assert.Null(reply);
+        }
+
+
+
+        [Fact]
+        public async Task Test()
+        {
+            var pid = Context.Spawn(Props.FromFunc(ctx =>
+            {
+                if (ctx.Message is string)
+                {
+                    ctx.Respond(null);
+                }
+                return Actor.Done;
+            }));
+
+            {
+                var reply = await Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1));
+                Assert.Null(reply);
+            }
+            {
+                var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
+                Assert.Null(reply);
+            }
+        }
+
+        [Fact]
+        public async Task TestSpawnNamed()
+        {
+            var pid = Context.SpawnNamed(Props.FromFunc(ctx =>
+            {
+                if (ctx.Message is string)
+                {
+                    ctx.Respond(null);
+                }
+                return Actor.Done;
+            }), "test");
+
+            {
+                var reply = await Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1));
+                Assert.Null(reply);
+            }
+            {
+                var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
+                Assert.Null(reply);
+            }
+        }
+
+        [Fact]
+        public void TestInATask() // This one will break
+        {
+            Task.Run(async () =>
+            {
+                var pid = Context.Spawn(Props.FromFunc(ctx =>
+                {
+                    if (ctx.Message is string)
+                    {
+                        ctx.Respond(null);
+                    }
+                    return Actor.Done;
+                }));
+
+                {
+                    var reply = await Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1));
+                    Assert.Null(reply);
+                }
+                {
+                    var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
+                    Assert.Null(reply);
+                }
+
+                Remote.Remote.Shutdown();
+            }).Wait();
         }
     }
 }
