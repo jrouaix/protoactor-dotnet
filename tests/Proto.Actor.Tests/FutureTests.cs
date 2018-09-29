@@ -1,5 +1,4 @@
-﻿using Proto.Remote;
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -137,8 +136,6 @@ namespace Proto.Tests
                     var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
                     Assert.Null(reply);
                 }
-
-                Remote.Remote.Shutdown();
             }).Wait();
         }
     }
