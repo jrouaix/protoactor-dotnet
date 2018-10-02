@@ -128,14 +128,31 @@ namespace Proto.Tests
                     return Actor.Done;
                 }));
 
+                await Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1));
+                Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Wait();
+                await Context.RequestAsync<object>(pid, "hello");
+                Context.RequestAsync<object>(pid, "hello").Wait();
+
+            }).Wait();
+        }
+
+        [Fact]
+        public async Task TestAwaitTheWrongType()
+        {
+            Task.Run(async () =>
+            {
+                var pid = Context.Spawn(Props.FromFunc(ctx =>
                 {
-                    var reply = await Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1));
-                    Assert.Null(reply);
-                }
-                {
-                    var reply = Context.RequestAsync<object>(pid, "hello", TimeSpan.FromSeconds(1)).Result;
-                    Assert.Null(reply);
-                }
+                    if (ctx.Message is string)
+                    {
+                        ctx.Respond(42);
+                    }
+                    return Actor.Done;
+                }));
+
+                var ex = await Assert.ThrowsAsync<AggregateException>(() => Context.RequestAsync<string>(pid, "hello"));
+                Assert.Single(ex.InnerExceptions);
+                Assert.Equal("Unexpected message. Was type System.Int32 but expected System.String", ex.InnerExceptions[0].Message);
             }).Wait();
         }
     }

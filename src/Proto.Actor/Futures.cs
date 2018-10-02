@@ -31,6 +31,7 @@ namespace Proto
         private FutureProcess(CancellationTokenSource cts)
         {
             _tcs = new TaskCompletionSource<T>();
+
             _cts = cts;
 
             var name = ProcessRegistry.Instance.NextId();
@@ -42,19 +43,13 @@ namespace Proto
 
             Pid = pid;
 
-            if (cts != null)
+
+            if (cts == null)
             {
-                //cts.Token.Register(() =>
-                //{
-                //    Stop(pid);
-                //    if (_tcs.Task.IsCompleted)
-                //    {
-                //        return;
-                //    }
-                //    _tcs.TrySetException(new TimeoutException("Request didn't receive any Response within the expected time."));
-                //});
-
-
+                Task = _tcs.Task.ContinueWith(x => x.Result);
+            }
+            else
+            {
                 //TODO: I don't think this is correct, there is probably a more kosher way to do this
                 System.Threading.Tasks.Task.Delay(-1, cts.Token)
                     .ContinueWith(t =>
@@ -64,12 +59,22 @@ namespace Proto
                             return;
                         }
 
-                        _tcs.TrySetException(new TimeoutException("Request didn't receive any Response within the expected time."));
+                        _tcs.TrySetException(
+                            new TimeoutException("Request didn't receive any Response within the expected time."));
+
                         Stop(pid);
                     });
-            }
 
-            Task = _tcs.Task;
+                Task = _tcs.Task.ContinueWith(x =>
+                {
+                    if (x.IsFaulted)
+                    {
+                        throw x.Exception;
+                    }
+
+                    return x.Result;
+                });
+            }
         }
 
         public PID Pid { get; }
@@ -78,24 +83,22 @@ namespace Proto
         protected internal override void SendUserMessage(PID pid, object message)
         {
             var msg = MessageEnvelope.UnwrapMessage(message);
-
-            if (msg is T || msg == null)
+            try
             {
-                if (_cts != null && _cts.IsCancellationRequested)
+                if (msg is T || msg == null)
                 {
-                    Stop(Pid);
-                    return;
+                    _tcs.TrySetResult((T)msg);
                 }
-
-                _tcs.TrySetResult((T)msg);
-                Stop(Pid);
+                else
+                {
+                    _tcs.TrySetException(
+                        new InvalidOperationException(
+                            $"Unexpected message. Was type {msg.GetType()} but expected {typeof(T)}"));
+                }
             }
-            else
+            finally
             {
                 Stop(Pid);
-                _tcs.SetException(
-                    new InvalidOperationException(
-                        $"Unexpected message. Was type {msg.GetType()} but expected {typeof(T)}"));
             }
         }
 
