@@ -58,7 +58,7 @@ namespace Proto
 
                         _tcs.TrySetException(
                             new TimeoutException("Request didn't receive any Response within the expected time."));
-
+                        
                         Stop(pid);
                     });
                 Task = WrapTask(_tcs.Task);
@@ -66,14 +66,12 @@ namespace Proto
             else
             {
                 Task = WrapTask(_tcs.Task);
-            }
-
-
+            }   
         }
 
         private static async Task<T> WrapTask(Task<T> task)
         {
-            await System.Threading.Tasks.Task.Yield();
+            await System.Threading.Tasks.Task.Delay(1);
             var res = await task;
             return res;
         }
@@ -88,7 +86,7 @@ namespace Proto
             {
                 if (msg is T || msg == null)
                 {
-                    _tcs.TrySetResult((T)msg);
+                    _tcs.TrySetResult((T) msg);
                 }
                 else
                 {
