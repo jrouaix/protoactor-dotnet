@@ -150,9 +150,8 @@ namespace Proto.Tests
                     return Actor.Done;
                 }));
 
-                var ex = await Assert.ThrowsAsync<AggregateException>(() => Context.RequestAsync<string>(pid, "hello"));
-                Assert.Single(ex.InnerExceptions);
-                Assert.Equal("Unexpected message. Was type System.Int32 but expected System.String", ex.InnerExceptions[0].Message);
+                var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => Context.RequestAsync<string>(pid, "hello"));
+                Assert.Equal("Unexpected message. Was type System.Int32 but expected System.String", ex.Message);
             }).Wait();
         }
     }

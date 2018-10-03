@@ -44,11 +44,8 @@ namespace Proto
             Pid = pid;
 
 
-            if (cts == null)
-            {
-                Task = _tcs.Task.ContinueWith(x => x.Result);
-            }
-            else
+
+            if (cts != null)
             {
                 //TODO: I don't think this is correct, there is probably a more kosher way to do this
                 System.Threading.Tasks.Task.Delay(-1, cts.Token)
@@ -64,17 +61,21 @@ namespace Proto
 
                         Stop(pid);
                     });
-
-                Task = _tcs.Task.ContinueWith(x =>
-                {
-                    if (x.IsFaulted)
-                    {
-                        throw x.Exception;
-                    }
-
-                    return x.Result;
-                });
+                Task = WrapTask(_tcs.Task);
             }
+            else
+            {
+                Task = WrapTask(_tcs.Task);
+            }
+
+
+        }
+
+        private static async Task<T> WrapTask(Task<T> task)
+        {
+            await System.Threading.Tasks.Task.Yield();
+            var res = await task;
+            return res;
         }
 
         public PID Pid { get; }
